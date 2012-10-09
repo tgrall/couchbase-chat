@@ -1,0 +1,163 @@
+<html>
+<header>
+
+
+
+
+<script src="/socket.io/socket.io.js"></script>
+<script src="http://netdna.bootstrapcdn.com/twitter-bootstrap/2.1.1/js/bootstrap.min.js"></script>
+<link href="http://netdna.bootstrapcdn.com/twitter-bootstrap/2.1.1/css/bootstrap-combined.min.css" rel="stylesheet">
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.6.4/jquery.min.js"></script>
+	
+<script>
+	var socket = io.connect('http://localhost:8080');
+	var firstkey = null;
+	
+
+	// on connection to server, ask for user's name with an anonymous callback
+	socket.on('connect', function(){
+		// call the server-side function 'adduser' and send one parameter (value of prompt)
+		socket.emit('connectuser', prompt("What's your name?"));
+		socket.emit('showhistory',5, null); // show the latest 10 messages before the login of the user
+	});
+
+	socket.on("updateStartkey", function(key) {
+		console.log(" KEY "+ firstkey +"  -  "+ new Date(firstkey) );
+		firstkey = key;
+	});
+
+
+	// listener, whenever the server emits 'updatechat', this updates the chat body
+	socket.on('updatechat', function (data, historyCall) {
+		
+		if (historyCall == undefined) {
+			historyCall = false;
+		}
+		
+		for (var i = 0; i < data.length; i++) {
+			var message = data[i];
+			var messageDateTime = new Date(message.timestamp);
+						
+			var lineToAdd = "<tr><td>"+ message.user +"</td><td>"+ message.message +"</td><td style='align:right' >"+ messageDateTime.toUTCString() +"</td></tr>";
+		
+			if (!historyCall) {		
+				//$('#conversationTable tr:last').after("<tr><td>"+ username +"</td><td>"+ data +"</td></tr>");
+				$('#conversationTable').append(lineToAdd);
+			} else {
+				//$('#conversationTable tr:first').before("<tr><td>"+ username +"</td><td>"+ data +"</td></tr>");
+				$('#conversationTable').prepend(lineToAdd);
+			}
+		}
+		
+	});
+
+	// listener, whenever the server emits 'updateusers', this updates the username list
+	socket.on('updateusers', function(data) {
+		$('#users').empty();
+		$.each(data, function(key, value) {
+			$('#users').append('<div>' + key + '</div>');
+		});
+	});
+
+	// on load of page
+	$(function(){
+		// when the client clicks SEND
+		$('#datasend').click( function() {
+			var message = $('#data').val();
+			$('#data').val('');
+			// tell server to execute 'sendchat' and send along one parameter
+			socket.emit('sendchat', message);
+			
+			
+	
+			
+		});
+
+
+		$('#history').click( function() {
+			var message = $('#data').val();
+			$('#data').val('');
+			// tell server to execute 'sendchat' and send along one parameter
+			socket.emit('showhistory',5, firstkey);
+		});
+		
+		// when the client hits ENTER on their keyboard
+		$('#data').keypress(function(e) {
+			if(e.which == 13) {
+				$(this).blur();
+				$('#datasend').focus().click();
+			}
+		});
+
+	});
+
+</script>
+
+
+<style>
+  body {
+    padding-top: 60px; /* 60px to make the container go all the way to the bottom of the topbar */
+  }
+
+</style>
+
+</header>
+
+<body>
+	
+    <div class="navbar navbar-inverse navbar-fixed-top">
+      <div class="navbar-inner">
+        <div class="container">
+          <a class="btn btn-navbar" data-toggle="collapse" data-target=".nav-collapse">
+            <span class="icon-bar"></span>
+            <span class="icon-bar"></span>
+            <span class="icon-bar"></span>
+          </a>
+          <a class="brand" href="#">Couchbase Chat</a>
+        </div>
+      </div>
+    </div>	
+	
+	
+    <div class="container">
+
+      <h1>Couchbase Chat</h1>
+      <p>A very simple Chat server using Node.js and Couchbase.</p>
+
+
+
+      <div class="row">
+        <div class="span10">
+          <h3>Messages</h3>
+		<a id="history" >Load older messages</a>
+		<div class="conversation-wrapper" id="conversationZone">
+			<table class="table table-striped table-bordered table-condensed" id="conversationTable">
+				<tbody>
+					<tr></tr>
+				</tbody>
+			</table>
+		</div>
+
+		<input id="data" style="width:200px;" />
+		<input type="button" id="datasend" value="send" />
+		</div>
+
+        <div class="span2">
+          <h3>Users</h3>
+		  <div id="users"></div>
+        </div>
+      </div>
+
+	<br>
+	<br>
+	<br>
+
+		
+		
+
+    </div> <!-- /container -->	
+	
+	
+	
+
+</body>
