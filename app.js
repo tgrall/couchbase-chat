@@ -101,8 +101,38 @@ io.sockets.on('connection', function(socket) {
 		socket.broadcast.emit('updatechat', 'SERVER', socket.username + ' has disconnected');
 	});
 	
-	
+
 	socket.on('showhistory', function(limit,startkey) {
+		// Since messages are based on a counter (we do not delete messages) we just need to loop 
+		// the first message will always be 0
+		// based on the id we can recreate the key and call the document (message) directly
+	
+	
+	    cb.get(
+	        "main:1",
+	        0,
+	        function (data, error, key, cas, flags, value) {
+	                console.log("Got %s=>%s for request '%s'", key, value, data);
+	        },
+	        "opaque");
+		
+		// startkey = 9;
+		// limit = 5;
+		// for( var i = startkey ; i >= (startkey-limit); i-- ) {
+		// 	console.log("Calling the key main:"+i  +"  start ");
+		// 	cb.get(
+		//     	"main:"+i,
+		//     	0,
+		//     	function (data, error, key, cas, flags, value) {
+		// 			var messages = [JSON.parse(value)];
+		// 				io.sockets.emit('updatechat', messages, true);
+		//     		},
+		//     		"ok");
+		// }
+		
+	});
+	
+	socket.on('showhistory2', function(limit,startkey) {
 		if (limit == undefined) {
 			limit = 5;
 		}
@@ -138,13 +168,32 @@ io.sockets.on('connection', function(socket) {
 /** NEED TO SEE WHAT IS THE BEST WAY TO CALL A METHOD **/
 function persistData( message) {
 	var messageKey = message.timestamp +"-"+ message.user;
-	cb.set(messageKey,  JSON.stringify(message) , 0, undefined, function(data, error, key, cas) {
-		if (error) {
-			console.log("Failed to store object");
-		} else {
-			if (key != messageKey) {
-				console.log("Callback called with wrong key!");
-			}
-		}
-	});
+	
+	// use a message id to count the number of messages in the chat
+	var id = 0;
+	cb.arithmetic(
+	    "main:msg_count",
+	    1,
+	    0,
+	    null,
+	    0,
+	     function (data, error, key, cas, value ) { 
+			var messageKey = "main:"+ value;
+			message.id = messageKey;
+			
+			cb.set(messageKey,  JSON.stringify(message) , 0, undefined, function(data, error, key, cas) {
+				if (error) {
+					console.log("Failed to store object");
+				} else {
+					if (key != messageKey) {
+						console.log("Callback called with wrong key!");
+					}
+				}
+			});
+
+
+		  } ,
+	 "");
+	
+
 }
