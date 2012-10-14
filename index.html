@@ -1,9 +1,6 @@
 <html>
 <header>
 
-
-
-
 <script src="/socket.io/socket.io.js"></script>
 <script src="http://netdna.bootstrapcdn.com/twitter-bootstrap/2.1.1/js/bootstrap.min.js"></script>
 <link href="http://netdna.bootstrapcdn.com/twitter-bootstrap/2.1.1/css/bootstrap-combined.min.css" rel="stylesheet">
@@ -13,12 +10,10 @@
 	var socket = io.connect('http://localhost:8080');
 	var firstkey = null;
 	
-
-	// on connection to server, ask for user's name with an anonymous callback
+	
 	socket.on('connect', function(){
-		// call the server-side function 'adduser' and send one parameter (value of prompt)
-		socket.emit('connectuser', prompt("What's your name?"));
-		socket.emit('showhistory',5, null); // show the latest 10 messages before the login of the user
+		socket.emit('addUser', prompt("What's your name?"));
+		socket.emit('showhistory',5, null); // show the latest n messages after the login of the user
 	});
 
 	socket.on("updateStartkey", function(key) {
@@ -26,66 +21,48 @@
 		firstkey = key;
 	});
 
-
-	// listener, whenever the server emits 'updatechat', this updates the chat body
-	socket.on('updatechat', function (data, historyCall) {
-		
+	socket.on('updateChatWindow', function (data, historyCall) {
 		if (historyCall == undefined) {
 			historyCall = false;
 		}
-		
 		for (var i = 0; i < data.length; i++) {
 			var message = data[i];
 			var messageDateTime = new Date(message.timestamp);
-						
 			var lineToAdd = "<tr><td>"+ message.user +"</td><td>"+ message.message +"</td><td style='align:right' >"+ messageDateTime.toUTCString() +"</td></tr>";
-		
+			// if history callback prepend the message if not put the message at the end of the table
 			if (!historyCall) {		
-				//$('#conversationTable tr:last').after("<tr><td>"+ username +"</td><td>"+ data +"</td></tr>");
 				$('#conversationTable').append(lineToAdd);
 			} else {
-				//$('#conversationTable tr:first').before("<tr><td>"+ username +"</td><td>"+ data +"</td></tr>");
 				$('#conversationTable').prepend(lineToAdd);
 			}
 		}
-		
 	});
 
-	// listener, whenever the server emits 'updateusers', this updates the username list
-	socket.on('updateusers', function(data) {
+	socket.on('updateUserWindow', function(data) {
 		$('#users').empty();
 		$.each(data, function(key, value) {
 			$('#users').append('<div>' + key + '</div>');
 		});
 	});
 
-	// on load of page
 	$(function(){
-		// when the client clicks SEND
-		$('#datasend').click( function() {
-			var message = $('#data').val();
-			$('#data').val('');
-			// tell server to execute 'sendchat' and send along one parameter
-			socket.emit('sendchat', message);
-			
-			
-	
-			
+		$('#postMessage').click( function() {
+			var message = $('#message').val();
+			$('#message').val('');
+			socket.emit('postMessage', message);
 		});
-
 
 		$('#history').click( function() {
 			var message = $('#data').val();
 			$('#data').val('');
-			// tell server to execute 'sendchat' and send along one parameter
 			socket.emit('showhistory',5, firstkey);
 		});
 		
-		// when the client hits ENTER on their keyboard
-		$('#data').keypress(function(e) {
+		$('#message').keypress(function(e) {
 			if(e.which == 13) {
 				$(this).blur();
-				$('#datasend').focus().click();
+				$('#postMessage').click();
+				$('#message').focus();
 			}
 		});
 
@@ -138,8 +115,8 @@
 			</table>
 		</div>
 
-		<input id="data" style="width:200px;" />
-		<input type="button" id="datasend" value="send" />
+		<input id="message" style="width:200px;" />
+		<input type="button" id="postMessage" value="send" />
 		</div>
 
         <div class="span2">
