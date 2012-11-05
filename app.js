@@ -3,39 +3,23 @@ var app = express();
 var http = require('http');
 var server = http.createServer(app);
 var io = require('socket.io').listen(server);
-var driver = require('couchbase');
-var baseview = require('baseview')('http://127.0.0.1:8092');
 
-var cb = new driver.Couchbase("127.0.0.1:8091", null, null, "default");
+var driver = require('couchbase');
+var couchbase = null;
+
+driver.connect({
+	"username": "",
+	"password": "",
+	"hostname": "localhost:8091",
+	"bucket": "default"}, 
+	function(err, bucket) {
+	if (err) {
+		throw (err)
+	}
+	couchbase = bucket;
+});
 
 server.listen(8080);
-
-
-function start() {
-	// check if the couchbase view exists 
- 	// if not create it
-	// check if the view exist if not create it	
-	baseview.getDesign('chat_messages', function(err,res) {
-		if (err != null && err.error == 'not_found') {
-		  baseview.setDesign('chat_messages', {
-		     'history': {
-		        'map': "function(doc,meta){if(doc.type == 'message'){emit(meta.id, doc.timestamp);}}"
-		   	  }
-		    },
-		    function(err, res){
-		      console.log(err);
-		    }
-		  );	
-		}
-		
-	});	
-	
-	
-
-}
-exports.start = start;
-start();
-
 
 app.get('/', function(req, res) {
 	res.sendfile(__dirname + '/index.html');
@@ -46,7 +30,10 @@ var usernames = {};
 
 io.sockets.on('connection', function(socket) {
 	
-	socket.on('sendchat', function(data) {
+	/**
+	 * When the user post a new message this even it called
+	 */
+	socket.on('postMessage', function(data) {
 		// create a new message
 		var message = {
 			type: "message",
@@ -54,28 +41,33 @@ io.sockets.on('connection', function(socket) {
 			message: data,
 			timestamp: Date.now()
 		}
-		var messages = [message];
-		io.sockets.emit('updatechat', messages);		
-		persistData(message);
+
+		couchbase.incr("chat:msg_count", function (data, error, key, cas, value ) { 
+				var messageKey = "chat:"+ value;
+				message.id = value;
+				io.sockets.emit('updateChatWindow', message);
+				couchbase.set(messageKey, JSON.stringify(message),function(err) {  });	
+		});
+			
+
 	});
+
 
 
 	/*
 	 * This function is used to 'connect' the user to the chat server
 	 */
-	socket.on('connectuser', function(username) {
-		socket.username = username; // store the username in the socket session
-		usernames[username] = username; // add the user to the list of user
+	socket.on('addUser', function(username) {
+		socket.username = username; 
+		usernames[username] = username; 
 		
-		// create a new message
 		var message = {
 			type: "message",
 			user: "SERVER",
 			message: "you have connected",
 			timestamp: Date.now()
 		}
-		var messages = [message];
-		socket.emit('updatechat', messages); // send back a message to the suer
+		socket.emit('updateChatWindow', message);
 		
 		// create a new message
 		message = {
@@ -85,115 +77,51 @@ io.sockets.on('connection', function(socket) {
 			timestamp: Date.now()
 		}
 		
-		socket.broadcast.emit('updatechat', message ); // broadcast to everybody
-		io.sockets.emit('updateusers', usernames); // update the userlist on the client
-
-
+		
+		// get the current message sequence
+		couchbase.get("chat:msg_count", function(err, value, meta) {
+			if (!err) { // if the key is found push the new key
+				socket.emit('updateStartKey', value);
+			} else {
+				console.log( "Error : "+ err );
+			}
+        });
+		socket.broadcast.emit('updateChatWindow', message );
+		io.sockets.emit('updateUserWindow', usernames); 
 	});
 
-	// when the user disconnects.. perform this
+	/**
+	 * Disconnect, send message to all users
+	 */
 	socket.on('disconnect', function() {
-		// remove the username from global usernames list
 		delete usernames[socket.username];
-		// update list of users in chat, client-side
-		io.sockets.emit('updateusers', usernames);
-		// echo globally that this client has left
-		socket.broadcast.emit('updatechat', 'SERVER', socket.username + ' has disconnected');
+		var message = {
+			type: "message",
+			user: "SERVER",
+			message: socket.username + " has disconnected",
+			timestamp: Date.now()
+		}
+		socket.broadcast.emit('updateChatWindow', message ); 
+		io.sockets.emit('updateUserWindow', usernames);
 	});
 	
 
+	/**
+	 * Return the message history
+	 */
 	socket.on('showhistory', function(limit,startkey) {
-		// Since messages are based on a counter (we do not delete messages) we just need to loop 
-		// the first message will always be 0
-		// based on the id we can recreate the key and call the document (message) directly
-	
-	
-	    cb.get(
-	        "main:1",
-	        0,
-	        function (data, error, key, cas, flags, value) {
-	                console.log("Got %s=>%s for request '%s'", key, value, data);
-	        },
-	        "opaque");
-		
-		// startkey = 9;
-		// limit = 5;
-		// for( var i = startkey ; i >= (startkey-limit); i-- ) {
-		// 	console.log("Calling the key main:"+i  +"  start ");
-		// 	cb.get(
-		//     	"main:"+i,
-		//     	0,
-		//     	function (data, error, key, cas, flags, value) {
-		// 			var messages = [JSON.parse(value)];
-		// 				io.sockets.emit('updatechat', messages, true);
-		//     		},
-		//     		"ok");
-		// }
-		
+		var keys = new Array();
+		for (i = startkey; i > (startkey-limit); i--) {
+			keys.push("chat:"+i);
+		}
+		couchbase.get(keys,function(err, doc, meta) {
+			socket.emit('updateChatWindow', doc, true);
+		});
+				
 	});
-	
-	socket.on('showhistory2', function(limit,startkey) {
-		if (limit == undefined) {
-			limit = 5;
-		}
-		var params = 
-			{ 'limit'		 : limit
-			, 'descending'	 : 'true'
-			, 'include_docs' : 'true'
-			, 'stale'		 : 'false' 
-			};
-		
-		if (startkey !== undefined && startkey !=null) {
-			params.startkey = JSON.stringify(startkey) ;
-		}
-		
-		baseview.view('chat_messages', 'history', params, function(error, data) {
-				var messages = new Array();
-		 		for( var i = data.rows.length-1,length = data.rows.length ; i >= 0; i-- ) {
-					var message = data.rows[i].doc.json;				
-					var messageDate = new Date(message.timestamp);
-					messages[i] = message;
-					// send the first key to the client
-					if(i == data.rows.length-1){
-						console.log(">>>> "+ message.message +" -- "+ message.timestamp);
-						io.sockets.emit('updateStartkey', message.timestamp - 1); // remove 1ms to the key
-					}
-				}	
-				io.sockets.emit('updatechat', messages, true); // show history
-			});			
-	  	});
+
+
 });
 
 
-/** NEED TO SEE WHAT IS THE BEST WAY TO CALL A METHOD **/
-function persistData( message) {
-	var messageKey = message.timestamp +"-"+ message.user;
-	
-	// use a message id to count the number of messages in the chat
-	var id = 0;
-	cb.arithmetic(
-	    "main:msg_count",
-	    1,
-	    0,
-	    null,
-	    0,
-	     function (data, error, key, cas, value ) { 
-			var messageKey = "main:"+ value;
-			message.id = messageKey;
-			
-			cb.set(messageKey,  JSON.stringify(message) , 0, undefined, function(data, error, key, cas) {
-				if (error) {
-					console.log("Failed to store object");
-				} else {
-					if (key != messageKey) {
-						console.log("Callback called with wrong key!");
-					}
-				}
-			});
 
-
-		  } ,
-	 "");
-	
-
-}
