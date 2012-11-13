@@ -1,5 +1,7 @@
 <html>
 <header>
+<title>Couchbase Chat : Sample Node+Couchbase Application</title>
+
 
 <script src="/socket.io/socket.io.js"></script>
 <script src="http://netdna.bootstrapcdn.com/twitter-bootstrap/2.1.1/js/bootstrap.min.js"></script>
@@ -9,8 +11,7 @@
 <script>
 	var socket = io.connect('http://localhost:8080');
 	var firstkey = 0;
-	
-	
+
 	socket.on('connect', function(){
 		socket.emit('addUser', prompt("What's your name?"));
 	});
@@ -18,7 +19,7 @@
 	socket.on("updateStartKey", function(key) {
 		console.log(" KEY "+ key );
 		firstkey = key;
-		socket.emit('showhistory',5, firstkey);
+		socket.emit('showHistory',5, firstkey);
 	});
 
 	socket.on('updateChatWindow', function (message, historyCall) {
@@ -56,7 +57,7 @@
 		$('#history').click( function() {
 			var message = $('#data').val();
 			$('#data').val('');
-			socket.emit('showhistory',5, firstkey);
+			socket.emit('showHistory',5, firstkey - 1);
 		});
 		
 		$('#message').keypress(function(e) {
@@ -86,6 +87,7 @@
     <div class="navbar navbar-inverse navbar-fixed-top">
       <div class="navbar-inner">
         <div class="container">
+		  <img class="pull-left" src="http://couchbasemodels.com//assets/couchbase_logo_red_circle_30x30.png" style="width: 30px;height: 30px;margin: 5px 8px 5px 0px" />
           <a class="btn btn-navbar" data-toggle="collapse" data-target=".nav-collapse">
             <span class="icon-bar"></span>
             <span class="icon-bar"></span>
@@ -116,7 +118,7 @@
 			</table>
 		</div>
 
-		<input id="message" style="width:200px;" />
+		<input id="message" style="width:500px;" />
 		<input type="button" id="postMessage" value="send" />
 		</div>
 

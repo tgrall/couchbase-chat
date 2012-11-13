@@ -38,15 +38,12 @@ driver.connect({
 					message: data,
 					timestamp: Date.now()
 				}
-
 				couchbase.incr("chat:msg_count", function (data, error, key, cas, value ) { 
 					var messageKey = "chat:"+ value;
 					message.id = value;
 					io.sockets.emit('updateChatWindow', message);
 					couchbase.set(messageKey, JSON.stringify(message),function(err) {  });	
 				});
-
-
 			});
 
 
@@ -57,7 +54,6 @@ driver.connect({
 			socket.on('addUser', function(username) {
 				socket.username = username; 
 				usernames[username] = username; 
-
 				var message = {
 					type: "message",
 					user: "SERVER",
@@ -73,7 +69,6 @@ driver.connect({
 					message: username + " has connected",
 					timestamp: Date.now()
 				}
-
 
 				// get the current message sequence
 				couchbase.get("chat:msg_count", function(err, value, meta) {
@@ -106,11 +101,14 @@ driver.connect({
 			/**
 			* Return the message history
 			*/
-			socket.on('showhistory', function(limit,startkey) {
+			socket.on('showHistory', function(limit,startkey) {
 				var keys = new Array();
-				for (i = startkey; i > (startkey-limit) || i ; i--) {
+				for (i = startkey; i > (startkey-limit) && i >= 0 ; i--) {
 					keys.push("chat:"+i);
 				}
+				
+				console.log( keys );
+				
 				couchbase.get(keys,function(err, doc, meta) {
 					socket.emit('updateChatWindow', doc, true);
 				});
