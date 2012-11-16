@@ -106,15 +106,10 @@ driver.connect({
 				for (i = startkey; i > (startkey-limit) && i >= 0 ; i--) {
 					keys.push("chat:"+i);
 				}
-				
-				console.log( keys );
-				
 				couchbase.get(keys,function(err, doc, meta) {
 					socket.emit('updateChatWindow', doc, true);
 				});
-
 			});
-
 
 		});
 
