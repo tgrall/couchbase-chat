@@ -2,12 +2,12 @@
 	"name": "couchbase-chat",
 	"description": "Sample chat application with node.js and couchbase",
 	"author": "Tugdual Grall",
-    "version": "0.0.1",
+    "version": "0.0.2",
     "dependencies": 
     {
 		"express": "3.0.x",
 		"socket.io": "0.9.x",
-		"couchbase": "0.0.3"
+		"couchbase": "0.0.11"
     }
 }
 

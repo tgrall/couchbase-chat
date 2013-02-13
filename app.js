@@ -7,9 +7,8 @@ var io = require('socket.io').listen(server);
 var driver = require('couchbase');
 
 driver.connect({
-	"username": "",
 	"password": "",
-	"hostname": "localhost:8091",
+	"hosts": ["localhost:8091"],
 	"bucket": "default"}, 
 	function(err, couchbase) {
 		if (err) {
@@ -38,7 +37,7 @@ driver.connect({
 					message: data,
 					timestamp: Date.now()
 				}
-				couchbase.incr("chat:msg_count", function (data, error, key, cas, value ) { 
+				couchbase.incr("chat:msg_count", function (err, value, meta) { 
 					var messageKey = "chat:"+ value;
 					message.id = value;
 					io.sockets.emit('updateChatWindow', message);
@@ -106,9 +105,7 @@ driver.connect({
 				for (i = startkey; i > (startkey-limit) && i >= 0 ; i--) {
 					keys.push("chat:"+i);
 				}
-				couchbase.get(keys,function(err, doc, meta) {
-					socket.emit('updateChatWindow', doc, true);
-				});
+				couchbase.get(keys, function(err, doc, meta){ socket.emit('updateChatWindow', doc, true); }, null);
 			});
 
 		});

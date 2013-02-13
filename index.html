@@ -17,7 +17,6 @@
 	});
 
 	socket.on("updateStartKey", function(key) {
-		console.log(" KEY "+ key );
 		firstkey = key;
 		socket.emit('showHistory',5, firstkey);
 	});
